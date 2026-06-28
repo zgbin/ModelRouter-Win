@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ModelRouter Console</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#1a1a2e;--card:#16213e;--accent:#0f3460;--highlight:#e94560;
+  --text:#e0e0e0;--text-muted:#8892a4;--border:#1e3a5f;
+  --green:#4caf50;--red:#f44336;--yellow:#ff9800;--gray:#607d8b;
+  --radius:8px;--shadow:0 2px 8px rgba(0,0,0,.3);
+}
+html,body{height:100%;font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+a{color:var(--highlight);text-decoration:none}
+
+/* Layout */
+.app{display:flex;height:100vh}
+.sidebar{width:220px;min-width:220px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-header{padding:16px;border-bottom:1px solid var(--border)}
+.sidebar-header h1{font-size:14px;color:var(--highlight);font-weight:700;line-height:1.4}
+.sidebar-header small{font-size:11px;color:var(--text-muted)}
+.sidebar-nav{flex:1;padding:8px 0}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;color:var(--text-muted);font-size:13px;transition:all .15s;border-left:3px solid transparent}
+.nav-item:hover{background:rgba(233,69,96,.08);color:var(--text)}
+.nav-item.active{color:var(--highlight);background:rgba(233,69,96,.1);border-left-color:var(--highlight);font-weight:600}
+.nav-item svg{width:18px;height:18px;flex-shrink:0}
+.main{flex:1;overflow-y:auto;padding:20px 24px}
+
+/* Stats bar */
+.stats-bar{display:flex;gap:12px;margin-bottom:20px}
+.stat-card{flex:1;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;align-items:center;gap:12px}
+.stat-card .stat-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px}
+.stat-card .stat-icon.calls{background:rgba(15,52,96,.6);color:#64b5f6}
+.stat-card .stat-icon.errors{background:rgba(244,67,54,.15);color:var(--red)}
+.stat-card .stat-icon.conn{background:rgba(76,175,80,.15);color:var(--green)}
+.stat-card .stat-info{display:flex;flex-direction:column}
+.stat-card .stat-value{font-size:20px;font-weight:700;line-height:1.2}
+.stat-card .stat-label{font-size:11px;color:var(--text-muted)}
+
+/* Group card */
+.group-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;box-shadow:var(--shadow)}
+.group-header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(15,52,96,.3)}
+.group-header .gname{font-weight:600;font-size:14px}
+.group-header .gport{font-size:12px;color:var(--text-muted);margin-left:auto}
+.group-actions{display:flex;gap:6px;margin-left:12px}
+
+/* Badges */
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;line-height:1.5}
+.badge-green{background:rgba(76,175,80,.15);color:var(--green)}
+.badge-red{background:rgba(244,67,54,.15);color:var(--red)}
+.badge-yellow{background:rgba(255,152,0,.15);color:var(--yellow)}
+.badge-gray{background:rgba(96,125,139,.15);color:var(--gray)}
+.badge-highlight{background:rgba(233,69,96,.15);color:var(--highlight)}
+
+/* Table */
+.model-table{width:100%;border-collapse:collapse;font-size:12px}
+.model-table th{text-align:left;padding:8px 12px;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);background:rgba(15,52,96,.15)}
+.model-table td{padding:7px 12px;border-bottom:1px solid rgba(30,58,95,.4)}
+.model-table tr:nth-child(even){background:rgba(15,52,96,.1)}
+.model-table tr:hover{background:rgba(233,69,96,.05)}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border:1px solid var(--border);border-radius:4px;background:var(--accent);color:var(--text);font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap;font-family:inherit}
+.btn:hover{background:rgba(15,52,96,.8);border-color:var(--highlight)}
+.btn-sm{padding:3px 8px;font-size:11px}
+.btn-danger{border-color:var(--red);color:var(--red)}
+.btn-danger:hover{background:rgba(244,67,54,.15)}
+.btn-primary{background:var(--highlight);border-color:var(--highlight);color:#fff}
+.btn-primary:hover{opacity:.85}
+.btn-success{border-color:var(--green);color:var(--green)}
+.btn-success:hover{background:rgba(76,175,80,.15)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* Toggle switch */
+.toggle{position:relative;width:36px;height:20px;cursor:pointer;display:inline-block}
+.toggle input{opacity:0;width:0;height:0}
+.toggle .slider{position:absolute;inset:0;background:var(--gray);border-radius:10px;transition:.2s}
+.toggle .slider::before{content:'';position:absolute;width:16px;height:16px;left:2px;bottom:2px;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked+.slider{background:var(--green)}
+.toggle input:checked+.slider::before{transform:translateX(16px)}
+
+/* Progress bar */
+.progress-bar{height:6px;background:rgba(96,125,139,.2);border-radius:3px;overflow:hidden;min-width:60px}
+.progress-bar .fill{height:100%;border-radius:3px;transition:width .3s}
+.progress-bar .fill.green{background:var(--green)}
+.progress-bar .fill.yellow{background:var(--yellow)}
+.progress-bar .fill.red{background:var(--red)}
+
+/* Lock status */
+.lock-section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px}
+.lock-section h3{font-size:13px;margin-bottom:8px;color:var(--text-muted)}
+.lock-items{display:flex;flex-wrap:wrap;gap:8px}
+.lock-item{display:flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(233,69,96,.1);border:1px solid rgba(233,69,96,.2);border-radius:4px;font-size:12px}
+.lock-item .lock-group{color:var(--text-muted)}
+.lock-item .lock-model{color:var(--highlight);font-weight:600}
+
+/* Config tab */
+.config-group{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
+.config-group-header{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;transition:background .15s}
+.config-group-header:hover{background:rgba(15,52,96,.3)}
+.config-group-header .expand-icon{transition:transform .2s;font-size:12px;color:var(--text-muted)}
+.config-group-header .expand-icon.open{transform:rotate(90deg)}
+.config-group-body{display:none;border-top:1px solid var(--border)}
+.config-group-body.open{display:block}
+.config-group-actions{margin-left:auto;display:flex;gap:6px;align-items:center}
+
+/* Provider card */
+.provider-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;box-shadow:var(--shadow)}
+.provider-header{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);background:rgba(15,52,96,.3)}
+.provider-header .pname{font-weight:600;font-size:14px}
+.provider-header .purl{font-size:11px;color:var(--text-muted);margin-left:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px}
+.provider-body{padding:12px 16px}
+.provider-section{margin-bottom:14px}
+.provider-section h4{font-size:12px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.key-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;font-family:monospace}
+.key-row .key-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted)}
+.key-usage{display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px}
+.key-usage .key-label{width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;color:var(--text-muted)}
+.provider-models{display:flex;flex-wrap:wrap;gap:6px}
+.provider-model-tag{padding:3px 8px;background:rgba(15,52,96,.4);border:1px solid var(--border);border-radius:4px;font-size:11px}
+
+/* Rate limit config row */
+.rate-config{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px}
+.rate-config label{color:var(--text-muted);font-size:11px}
+.rate-config select,.rate-config input{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:12px;font-family:inherit}
+.rate-config input{width:60px}
+.rate-config select{width:140px}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;justify-content:center;align-items:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);width:440px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.modal-header h3{font-size:15px}
+.modal-close{background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:4px 8px;line-height:1}
+.modal-close:hover{color:var(--highlight)}
+.modal-body{padding:18px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px}
+.form-group input,.form-group select,.form-group textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:4px;font-size:13px;font-family:inherit}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--highlight)}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border)}
+
+/* Toast */
+.toast-container{position:fixed;top:20px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:8px}
+.toast{padding:10px 16px;border-radius:var(--radius);font-size:13px;animation:slideIn .3s ease;min-width:200px;box-shadow:var(--shadow)}
+.toast-success{background:rgba(76,175,80,.9);color:#fff}
+.toast-error{background:rgba(244,67,54,.9);color:#fff}
+.toast-info{background:rgba(15,52,96,.9);color:var(--text);border:1px solid var(--border)}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* Spinner */
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--highlight);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay{display:flex;align-items:center;justify-content:center;padding:40px;gap:8px;color:var(--text-muted);font-size:13px}
+
+/* Tab content */
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* Responsive */
+@media(max-width:768px){
+  .sidebar{width:56px;min-width:56px}
+  .sidebar-header h1,.sidebar-header small,.nav-item span{display:none}
+  .nav-item{justify-content:center;padding:12px}
+  .main{padding:12px}
+  .stats-bar{flex-wrap:wrap}
+  .stat-card{min-width:calc(50% - 8px)}
+  .model-table{font-size:11px}
+  .model-table th,.model-table td{padding:5px 6px}
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>ModelRouter</h1>
+      <small>v4.1 (Windows)</small>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-item" data-tab="config" onclick="switchTab('config')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Config</span>
+      </div>
+      <div class="nav-item" data-tab="providers" onclick="switchTab('providers')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        <span>Providers</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="main">
+    <!-- Dashboard Tab -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div class="stats-bar" id="stats-bar">
+        <div class="stat-card"><div class="stat-icon calls">&#128172;</div><div class="stat-info"><span class="stat-value" id="total-calls">0</span><span class="stat-label">Total Calls</span></div></div>
+        <div class="stat-card"><div class="stat-icon errors">&#9888;</div><div class="stat-info"><span class="stat-value" id="total-errors">0</span><span class="stat-label">Total Errors</span></div></div>
+        <div class="stat-card"><div class="stat-icon conn">&#128279;</div><div class="stat-info"><span class="stat-value" id="active-conn">0</span><span class="stat-label">Active Connections</span></div></div>
+      </div>
+      <div id="lock-status-section" class="lock-section" style="display:none">
+        <h3>Locked Models</h3>
+        <div class="lock-items" id="lock-items"></div>
+      </div>
+      <div id="dashboard-groups"></div>
+    </div>
+
+    <!-- Config Tab -->
+    <div id="tab-config" class="tab-content">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h2 style="font-size:16px">Group Configuration</h2>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="showAddGroupModal()">+ Add Group</button>
+          <button class="btn btn-success" onclick="saveConfig()">&#128190; Save</button>
+        </div>
+      </div>
+      <div id="config-groups"></div>
+    </div>
+
+    <!-- Providers Tab -->
+    <div id="tab-providers" class="tab-content">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h2 style="font-size:16px">Provider Management</h2>
+        <button class="btn btn-primary" onclick="showAddProviderModal()">+ Add Provider</button>
+      </div>
+      <div id="providers-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><h3 id="modal-title"></h3><button class="modal-close" onclick="closeModal()">&times;</button></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ============================================================
+// Global state
+// ============================================================
+let dashboardTimer = null;
+let currentTab = 'dashboard';
+let providersCache = [];
+
+// ============================================================
+// Tab switching
+// ============================================================
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === tab));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('active', t.id === 'tab-' + tab));
+  if (tab === 'dashboard') refreshDashboard();
+  else if (tab === 'config') refreshConfig();
+  else if (tab === 'providers') refreshProviders();
+}
+
+// ============================================================
+// API helpers
+// ============================================================
+async function api(url, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const resp = await fetch(url, opts);
+    const data = await resp.json();
+    if (data.error) { toast(data.error.message || 'Error', 'error'); return null; }
+    return data;
+  } catch (e) {
+    toast('Network error: ' + e.message, 'error');
+    return null;
+  }
+}
+
+// ============================================================
+// Toast notifications
+// ============================================================
+function toast(msg, type = 'info') {
+  const c = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3000);
+}
+
+// ============================================================
+// Modal
+// ============================================================
+function openModal(title, bodyHtml, footerHtml) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  document.getElementById('modal-footer').innerHTML = footerHtml;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+function closeModal() { document.getElementById('modal-overlay').classList.remove('show'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============================================================
+// Status badge helper
+// ============================================================
+function statusBadge(healthy) {
+  if (healthy === true) return '<span class="badge badge-green">healthy</span>';
+  if (healthy === false) return '<span class="badge badge-red">error</span>';
+  return '<span class="badge badge-gray">unknown</span>';
+}
+function enabledBadge(enabled) {
+  return enabled ? '<span class="badge badge-green">ON</span>' : '<span class="badge badge-gray">OFF</span>';
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+async function refreshDashboard() {
+  const data = await api('/api/console/dashboard');
+  if (!data) return;
+  // Stats
+  const stats = data.api_call_stats || {};
+  document.getElementById('total-calls').textContent = stats.total_calls || 0;
+  document.getElementById('total-errors').textContent = stats.total_errors || 0;
+  const totalConn = Object.values(data.active_connections || {}).reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  document.getElementById('active-conn').textContent = totalConn;
+
+  // Lock status
+  const lockStatus = data.lock_status || {};
+  const locks = lockStatus.locks || [];
+  const lockSection = document.getElementById('lock-status-section');
+  const lockItems = document.getElementById('lock-items');
+  if (locks.length > 0) {
+    lockSection.style.display = '';
+    lockItems.innerHTML = locks.map(l =>
+      `<div class="lock-item"><span class="lock-group">${esc(l.group)}</span><span class="lock-model">&#128274; ${esc(l.model_id)}</span></div>`
+    ).join('');
+  } else {
+    lockSection.style.display = 'none';
+  }
+
+  // Groups
+  const groups = data.groups || [];
+  const currentModels = data.group_current_model || {};
+  const container = document.getElementById('dashboard-groups');
+  container.innerHTML = groups.map(g => {
+    const isLocked = !!g.locked_model;
+    const currentModel = currentModels[g.name] || g.current_model || '';
+    return `
+    <div class="group-card">
+      <div class="group-header">
+        <span class="gname">${esc(g.name)}</span>
+        ${enabledBadge(g.enabled)}
+        <span class="gport">Port ${g.port}</span>
+        <div class="group-actions">
+          ${isLocked
+            ? `<button class="btn btn-sm btn-danger" onclick="unlockModel('${esc(g.name)}')">Unlock</button>`
+            : `<button class="btn btn-sm" onclick="lockModelPrompt('${esc(g.name)}')">Lock</button>`
+          }
+          <button class="btn btn-sm btn-success" onclick="batchSpeedTest('${esc(g.name)}')">&#9889; Speed Test</button>
+        </div>
+      </div>
+      <table class="model-table">
+        <thead><tr><th>Name</th><th>Provider</th><th>Status</th><th>Response</th><th>Requests</th><th>Current</th><th>Actions</th></tr></thead>
+        <tbody>
+        ${g.models.map(m => {
+          const isCurrent = m.id === currentModel;
+          const rt = m.status && m.status.avg_response_time != null ? m.status.avg_response_time : null;
+          const rtText = rt != null && rt >= 0 ? Math.round(rt) + 'ms' : '-';
+          const reqs = m.status ? m.status.total_requests || 0 : 0;
+          const healthy = m.status ? m.status.is_healthy : null;
+          return `<tr>
+            <td>${esc(m.name || m.id)}</td>
+            <td>${esc(m.provider_name || m.provider_id)}</td>
+            <td>${statusBadge(healthy)}</td>
+            <td>${rtText}</td>
+            <td>${reqs}</td>
+            <td>${isCurrent ? '<span class="badge badge-highlight">&#9654; Current</span>' : ''}</td>
+            <td><button class="btn btn-sm" onclick="speedTest('${esc(m.id)}','${esc(m.provider_id)}')">&#9889; Test</button></td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }).join('');
+}
+
+async function speedTest(modelId, providerId) {
+  toast('Running speed test for ' + modelId + '...', 'info');
+  const result = await api('/api/console/speed_test', 'POST', { model_id: modelId, provider_id: providerId });
+  if (result) toast('Speed test completed for ' + modelId, 'success');
+  refreshDashboard();
+}
+
+async function batchSpeedTest(groupName) {
+  toast('Batch speed test started for ' + groupName, 'info');
+  const data = await api('/api/console/dashboard');
+  if (!data) return;
+  const group = (data.groups || []).find(g => g.name === groupName);
+  if (!group) return;
+  for (const m of group.models) {
+    await api('/api/console/speed_test', 'POST', { model_id: m.id, provider_id: m.provider_id });
+  }
+  toast('Batch speed test completed for ' + groupName, 'success');
+  refreshDashboard();
+}
+
+function lockModelPrompt(group) {
+  const data = window._dashData;
+  if (!data) return;
+  const g = (data.groups || []).find(x => x.name === group);
+  if (!g || !g.models.length) return;
+  const options = g.models.map(m => `<option value="${esc(m.id)}">${esc(m.name || m.id)}</option>`).join('');
+  openModal('Lock Model', `
+    <div class="form-group">
+      <label>Group</label>
+      <input type="text" value="${esc(group)}" disabled />
+    </div>
+    <div class="form-group">
+      <label>Model</label>
+      <select id="lock-model-id">${options}</select>
+    </div>
+  `, `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doLockModel()">Lock</button>`);
+  window._lockGroup = group;
+}
+
+async function doLockModel() {
+  const modelId = document.getElementById('lock-model-id').value;
+  const group = window._lockGroup;
+  closeModal();
+  const result = await api('/api/console/lock_model', 'POST', { group, model_id: modelId });
+  if (result) toast('Model locked: ' + modelId, 'success');
+  refreshDashboard();
+}
+
+async function unlockModel(group) {
+  const result = await api('/api/console/unlock_model', 'POST', { group });
+  if (result) toast('Group unlocked: ' + group, 'success');
+  refreshDashboard();
+}
+
+// ============================================================
+// CONFIG
+// ============================================================
+async function refreshConfig() {
+  const data = await api('/api/console/groups');
+  if (!data) return;
+  const groups = data.groups || [];
+  // Also fetch providers for dropdown
+  const pData = await api('/api/console/providers');
+  providersCache = (pData && pData.providers) ? pData.providers : (pData || []);
+  const container = document.getElementById('config-groups');
+  container.innerHTML = groups.map((g, gi) => {
+    return `
+    <div class="config-group">
+      <div class="config-group-header" onclick="toggleConfigGroup(this)">
+        <span class="expand-icon">&#9654;</span>
+        <span style="font-weight:600;font-size:14px">${esc(g.name)}</span>
+        <span style="font-size:11px;color:var(--text-muted)">Port ${g.port}</span>
+        ${enabledBadge(g.enabled)}
+        <div class="config-group-actions" onclick="event.stopPropagation()">
+          <label class="toggle" title="Enable/Disable">
+            <input type="checkbox" ${g.enabled ? 'checked' : ''} onchange="toggleGroup('${esc(g.name)}', this.checked)">
+            <span class="slider"></span>
+          </label>
+          <button class="btn btn-sm" onclick="showAddModelModal('${esc(g.name)}')">+ Model</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteGroup('${esc(g.name)}')">&#128465;</button>
+        </div>
+      </div>
+      <div class="config-group-body">
+        <table class="model-table">
+          <thead><tr><th>Name</th><th>Model ID</th><th>Provider</th><th>Timeout</th><th>Enabled</th><th>Actions</th></tr></thead>
+          <tbody>
+          ${(g.models || []).map(m => `<tr>
+            <td>${esc(m.name)}</td>
+            <td style="font-family:monospace;font-size:11px">${esc(m.id)}</td>
+            <td>${esc(m.provider_id || m.provider)}</td>
+            <td>${m.timeout}s</td>
+            <td><label class="toggle"><input type="checkbox" ${m.enabled ? 'checked' : ''} onchange="toggleModel('${esc(g.name)}','${esc(m.id)}',this.checked)"><span class="slider"></span></label></td>
+            <td><button class="btn btn-sm btn-danger" onclick="deleteModel('${esc(g.name)}','${esc(m.id)}')">&#128465;</button></td>
+          </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleConfigGroup(header) {
+  const icon = header.querySelector('.expand-icon');
+  const body = header.nextElementSibling;
+  icon.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
+function showAddGroupModal() {
+  openModal('Add Group', `
+    <div class="form-group"><label>Group Name</label><input id="new-group-name" placeholder="e.g. My Group"></div>
+    <div class="form-group"><label>Description</label><input id="new-group-desc" placeholder="Optional description"></div>
+    <div class="form-group"><label>Port</label><input id="new-group-port" type="number" value="8195"></div>
+  `, `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doAddGroup()">Add</button>`);
+}
+
+async function doAddGroup() {
+  const name = document.getElementById('new-group-name').value.trim();
+  const desc = document.getElementById('new-group-desc').value.trim();
+  const port = parseInt(document.getElementById('new-group-port').value) || 8195;
+  if (!name) { toast('Group name is required', 'error'); return; }
+  closeModal();
+  const result = await api('/api/console/groups', 'POST', { name, description: desc, port, enabled: true, models: [] });
+  if (result) { toast('Group added: ' + name, 'success'); refreshConfig(); }
+}
+
+async function deleteGroup(name) {
+  if (!confirm('Delete group "' + name + '"?')) return;
+  const result = await api('/api/console/groups/' + encodeURIComponent(name), 'DELETE');
+  if (result) { toast('Group deleted: ' + name, 'success'); refreshConfig(); }
+}
+
+async function toggleGroup(name, enabled) {
+  const result = await api('/api/console/groups/' + encodeURIComponent(name) + '/toggle', 'POST', { enabled });
+  if (result) toast('Group ' + name + ' ' + (enabled ? 'enabled' : 'disabled'), 'success');
+}
+
+function showAddModelModal(groupName) {
+  const provOpts = providersCache.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  openModal('Add Model to ' + groupName, `
+    <div class="form-group"><label>Model ID</label><input id="new-model-id" placeholder="e.g. meta/llama-3.1-8b-instruct"></div>
+    <div class="form-group"><label>Display Name</label><input id="new-model-name" placeholder="e.g. Llama 3.1 8B"></div>
+    <div class="form-group"><label>Provider</label><select id="new-model-provider">${provOpts}</select></div>
+    <div class="form-group"><label>Timeout (seconds)</label><input id="new-model-timeout" type="number" value="60"></div>
+  `, `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doAddModel('${esc(groupName)}')">Add</button>`);
+}
+
+async function doAddModel(groupName) {
+  const model_id = document.getElementById('new-model-id').value.trim();
+  const name = document.getElementById('new-model-name').value.trim() || model_id;
+  const provider_id = document.getElementById('new-model-provider').value;
+  const timeout = parseInt(document.getElementById('new-model-timeout').value) || 60;
+  if (!model_id) { toast('Model ID is required', 'error'); return; }
+  closeModal();
+  const result = await api('/api/console/groups/' + encodeURIComponent(groupName) + '/models', 'POST', {
+    model_id, name, provider_id, timeout, enabled: true, priority: 1
+  });
+  if (result) { toast('Model added to ' + groupName, 'success'); refreshConfig(); }
+}
+
+async function deleteModel(groupName, modelId) {
+  if (!confirm('Delete model "' + modelId + '"?')) return;
+  const result = await api('/api/console/groups/' + encodeURIComponent(groupName) + '/models/' + encodeURIComponent(modelId), 'DELETE');
+  if (result) { toast('Model deleted', 'success'); refreshConfig(); }
+}
+
+async function toggleModel(groupName, modelId, enabled) {
+  await api('/api/console/groups/' + encodeURIComponent(groupName) + '/models/' + encodeURIComponent(modelId) + '/toggle', 'POST', { enabled });
+}
+
+async function saveConfig() {
+  toast('Configuration saved', 'success');
+}
+
+// ============================================================
+// PROVIDERS
+// ============================================================
+async function refreshProviders() {
+  const data = await api('/api/console/providers');
+  if (!data) return;
+  providersCache = Array.isArray(data) ? data : (data.providers || []);
+  const container = document.getElementById('providers-list');
+  container.innerHTML = providersCache.map(p => {
+    const keys = p.api_keys || [];
+    const models = p.models || [];
+    const rlType = p.rate_limit_type || 'PER_MINUTE';
+    const rlValue = p.rate_limit_value || 0;
+    const threshold = p.switch_threshold || 0;
+    const strategy = p.key_switch_strategy || 'THRESHOLD';
+    const reqCounts = p.request_counts || {};
+    const keyUsageHtml = keys.map((k, i) => {
+      const count = reqCounts[k] || 0;
+      const pct = rlValue > 0 ? Math.min(100, (count / rlValue) * 100) : 0;
+      const fillClass = pct > 80 ? 'red' : pct > 50 ? 'yellow' : 'green';
+      return `<div class="key-usage">
+        <span class="key-label" title="${esc(k)}">Key ${i + 1}</span>
+        <div class="progress-bar"><div class="fill ${fillClass}" style="width:${pct}%"></div></div>
+        <span style="font-size:11px;color:var(--text-muted)">${count}/${rlValue || '&infin;'}</span>
+        <button class="btn btn-sm btn-danger" onclick="removeKey('${esc(p.id)}','${esc(k)}')">&#128465;</button>
+      </div>`;
+    }).join('');
+
+    return `
+    <div class="provider-card">
+      <div class="provider-header">
+        <span class="pname">${esc(p.name)}</span>
+        ${enabledBadge(p.enabled)}
+        <span class="purl">${esc(p.base_url)}</span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="showEditProviderModal('${esc(p.id)}')">Edit</button>
+          ${!p.is_default ? `<button class="btn btn-sm btn-danger" onclick="deleteProvider('${esc(p.id)}')">&#128465;</button>` : ''}
+        </div>
+      </div>
+      <div class="provider-body">
+        <div class="provider-section">
+          <h4>API Keys (${keys.length})</h4>
+          ${keyUsageHtml}
+          <div style="margin-top:8px"><button class="btn btn-sm" onclick="showAddKeyModal('${esc(p.id)}')">+ Add Key</button></div>
+        </div>
+        <div class="provider-section">
+          <h4>Rate Limit</h4>
+          <div class="rate-config">
+            <label>Type</label>
+            <select onchange="updateRateLimit('${esc(p.id)}',this)" id="rl-type-${esc(p.id)}">
+              <option value="UNLIMITED" ${rlType==='UNLIMITED'?'selected':''}>UNLIMITED</option>
+              <option value="PER_MINUTE" ${rlType==='PER_MINUTE'?'selected':''}>PER_MINUTE</option>
+              <option value="PER_5_HOURS" ${rlType==='PER_5_HOURS'?'selected':''}>PER_5_HOURS</option>
+              <option value="PER_DAY" ${rlType==='PER_DAY'?'selected':''}>PER_DAY</option>
+            </select>
+            <label>Limit</label>
+            <input type="number" value="${rlValue}" onchange="updateRateLimit('${esc(p.id)}',this)" id="rl-val-${esc(p.id)}" style="width:60px">
+            <label>Threshold</label>
+            <input type="number" value="${threshold}" onchange="updateRateLimit('${esc(p.id)}',this)" id="rl-thr-${esc(p.id)}" style="width:60px">
+          </div>
+        </div>
+        <div class="provider-section">
+          <h4>Key Switch Strategy</h4>
+          <div class="rate-config">
+            <select onchange="updateKeyStrategy('${esc(p.id)}',this.value)" id="ks-${esc(p.id)}">
+              <option value="THRESHOLD" ${strategy==='THRESHOLD'?'selected':''}>THRESHOLD</option>
+              <option value="EVERY_REQUEST" ${strategy==='EVERY_REQUEST'?'selected':''}>EVERY_REQUEST</option>
+            </select>
+          </div>
+        </div>
+        <div class="provider-section">
+          <h4>Models (${models.length})</h4>
+          <div class="provider-models">
+            ${models.map(m => `<span class="provider-model-tag">${esc(m.name || m.id)}</span>`).join('')}
+          </div>
+          <div style="margin-top:8px;display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="fetchProviderModels('${esc(p.id)}')">&#128270; Fetch Models</button>
+            <button class="btn btn-sm" onclick="showAddProviderModelModal('${esc(p.id)}')">+ Add Model</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showAddKeyModal(providerId) {
+  openModal('Add API Key', `
+    <div class="form-group"><label>API Key</label><input id="new-key-value" placeholder="nvapi-..." style="font-family:monospace"></div>
+  `, `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doAddKey('${esc(providerId)}')">Add</button>`);
+}
+
+async function doAddKey(providerId) {
+  const key = document.getElementById('new-key-value').value.trim();
+  if (!key) { toast('Key is required', 'error'); return; }
+  closeModal();
+  const result = await api('/api/console/providers/' + encodeURIComponent(providerId) + '/keys', 'POST', { key });
+  if (result) { toast('Key added', 'success'); refreshProviders(); }
+}
+
+async function removeKey(providerId, key) {
+  if (!confirm('Remove this key?')) return;
+  const result = await api('/api/console/providers/' + encodeURIComponent(providerId) + '/keys', 'DELETE', { key });
+  if (result) { toast('Key removed', 'success'); refreshProviders(); }
+}
+
+async function updateRateLimit(providerId, el) {
+  const type = document.getElementById('rl-type-' + providerId).value;
+  const value = parseInt(document.getElementById('rl-val-' + providerId).value) || 0;
+  const threshold = parseInt(document.getElementById('rl-thr-' + providerId).value) || 0;
+  await api('/api/console/providers/' + encodeURIComponent(providerId) + '/rate_limit', 'PUT', {
+    rate_limit_type: type, rate_limit_value: value, switch_threshold: threshold
+  });
+  toast('Rate limit updated', 'success');
+}
+
+async function updateKeyStrategy(providerId, strategy) {
+  await api('/api/console/providers/' + encodeURIComponent(providerId) + '/key_strategy', 'PUT', { key_switch_strategy: strategy });
+  toast('Strategy updated', 'success');
+}
+
+async function fetchProviderModels(providerId) {
+  toast('Fetching models...', 'info');
+  const result = await api('/api/console/providers/' + encodeURIComponent(providerId) + '/fetch_models');
+  if (result) { toast('Models fetched', 'success'); refreshProviders(); }
+}
+
+function showAddProviderModelModal(providerId) {
+  openModal('Add Model to Provider', `
+    <div class="form-group"><label>Model ID</label><input id="new-pmodel-id" placeholder="e.g. meta/llama-3.1-8b-instruct"></div>
+    <div class="form-group"><label>Display Name</label><input id="new-pmodel-name" placeholder="e.g. Llama 3.1 8B"></div>
+  `, `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doAddProviderModel('${esc(providerId)}')">Add</button>`);
+}
+
+async function doAddProviderModel(providerId) {
+  const id = document.getElementById('new-pmodel-id').value.trim();
+  const name = document.getElementById('new-pmodel-name').value.trim() || id;
+  if (!id) { toast('Model ID is required', 'error'); return; }
+  closeModal();
+  // Use the providers update endpoint to add a model
+  const provider = providersCache.find(p => p.id === providerId);
+  if (!provider) return;
+  const newModels = [...(provider.models || []), { id, name }];
+  const result = await api('/api/console/providers/' + encodeURIComponent(providerId), 'PUT', {
+    ...provider, models: newModels
+  });
+  if (result) { toast('Model added to provider', 'success'); refreshProviders(); }
+}
+
+function showAddProviderModal() {
+  openModal('Add Provider', `
+    <div class="form-group"><label>Provider ID</label><input id="new-prov-id" placeholder="e.g. openai"></div>
+    <div class="form-group"><label>Name</label><input id="new-prov-name" placeholder="e.g. OpenAI"></div>
+    <div class="form-group"><label>Base URL</label><input id="new-prov-url" placeholder="https://api.openai.com/v1"></div>
+  `, `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doAddProvider()">Add</button>`);
+}
+
+async function doAddProvider() {
+  const id = document.getElementById('new-prov-id').value.trim();
+  const name = document.getElementById('new-prov-name').value.trim();
+  const base_url = document.getElementById('new-prov-url').value.trim();
+  if (!id || !name) { toast('ID and Name are required', 'error'); return; }
+  closeModal();
+  const result = await api('/api/console/providers', 'POST', {
+    id, name, base_url: base_url || 'https://api.openai.com/v1',
+    api_keys: [], rate_limit_type: 'PER_MINUTE', rate_limit_value: 40,
+    switch_threshold: 35, key_switch_strategy: 'THRESHOLD',
+    models: [], enabled: true, is_default: false
+  });
+  if (result) { toast('Provider added: ' + name, 'success'); refreshProviders(); }
+}
+
+function showEditProviderModal(providerId) {
+  const p = providersCache.find(x => x.id === providerId);
+  if (!p) return;
+  openModal('Edit Provider', `
+    <div class="form-group"><label>Name</label><input id="edit-prov-name" value="${esc(p.name)}"></div>
+    <div class="form-group"><label>Base URL</label><input id="edit-prov-url" value="${esc(p.base_url)}"></div>
+    <div class="form-group">
+      <label>Enabled</label>
+      <label class="toggle"><input type="checkbox" id="edit-prov-enabled" ${p.enabled ? 'checked' : ''}><span class="slider"></span></label>
+    </div>
+  `, `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doEditProvider('${esc(providerId)}')">Save</button>`);
+}
+
+async function doEditProvider(providerId) {
+  const name = document.getElementById('edit-prov-name').value.trim();
+  const base_url = document.getElementById('edit-prov-url').value.trim();
+  const enabled = document.getElementById('edit-prov-enabled').checked;
+  closeModal();
+  // Update base_url separately
+  if (base_url) await api('/api/console/providers/' + encodeURIComponent(providerId) + '/base_url', 'PUT', { base_url });
+  // Update name and enabled via full update
+  const p = providersCache.find(x => x.id === providerId);
+  if (p) {
+    const result = await api('/api/console/providers/' + encodeURIComponent(providerId), 'PUT', {
+      ...p, name, enabled
+    });
+    if (result) { toast('Provider updated', 'success'); refreshProviders(); }
+  }
+}
+
+async function deleteProvider(providerId) {
+  if (!confirm('Delete provider "' + providerId + '"?')) return;
+  const result = await api('/api/console/providers/' + encodeURIComponent(providerId), 'DELETE');
+  if (result) { toast('Provider deleted', 'success'); refreshProviders(); }
+}
+
+// ============================================================
+// Utility
+// ============================================================
+function esc(str) {
+  if (str == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(str);
+  return d.innerHTML;
+}
+
+// ============================================================
+// Auto-refresh dashboard
+// ============================================================
+function startDashboardRefresh() {
+  if (dashboardTimer) clearInterval(dashboardTimer);
+  refreshDashboard();
+  dashboardTimer = setInterval(() => {
+    if (currentTab === 'dashboard') refreshDashboard();
+  }, 10000);
+}
+
+// ============================================================
+// Init
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Cache dashboard data for lock prompts
+  const origRefresh = refreshDashboard;
+  const origRefreshWrapper = async () => {
+    await origRefresh();
+    // store data for lock prompt
+    const d = await api('/api/console/dashboard');
+    window._dashData = d;
+  };
+  window.refreshDashboard = origRefreshWrapper;
+  startDashboardRefresh();
+});
+</script>
+</body>
+</html>

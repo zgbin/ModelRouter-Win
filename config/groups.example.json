@@ -1,0 +1,23 @@
+[
+  {
+    "name": "综合对话组",
+    "port": 8190,
+    "enabled": true,
+    "description": "通用对话和问答",
+    "is_backup": false,
+    "models": [
+      {"id": "meta/llama-3.1-70b-instruct", "name": "Llama 3.1 70B", "provider_id": "nvidia", "priority": 1, "enabled": true, "timeout": 60, "endpoint": "", "api_key": "", "is_fallback": false, "provider": "nvidia"},
+      {"id": "model-name", "name": "Model Display Name", "provider_id": "custom-provider", "priority": 2, "enabled": true, "timeout": 60, "endpoint": "", "api_key": "", "is_fallback": false, "provider": "custom-provider"}
+    ]
+  },
+  {
+    "name": "快速",
+    "port": 8191,
+    "enabled": true,
+    "description": "快速响应",
+    "is_backup": false,
+    "models": [
+      {"id": "meta/llama-3.1-70b-instruct", "name": "Llama 3.1 70B", "provider_id": "nvidia", "priority": 1, "enabled": true, "timeout": 30, "endpoint": "", "api_key": "", "is_fallback": false, "provider": "nvidia"}
+    ]
+  }
+]

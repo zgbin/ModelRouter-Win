@@ -1,0 +1,33 @@
+[
+  {
+    "id": "nvidia",
+    "name": "NVIDIA NIM",
+    "base_url": "https://integrate.api.nvidia.com/v1",
+    "api_keys": ["nvapi-YOUR_KEY_HERE"],
+    "enabled": true,
+    "is_default": true,
+    "key_switch_strategy": "every_request",
+    "rate_limit_type": "per_minute",
+    "rate_limit_value": 40,
+    "switch_threshold": 35,
+    "models": [
+      {"id": "meta/llama-3.1-70b-instruct", "name": "Llama 3.1 70B"},
+      {"id": "qwen/qwen3-next-80b-a3b-instruct", "name": "Qwen3 Next 80B"}
+    ]
+  },
+  {
+    "id": "custom-provider",
+    "name": "Custom Provider",
+    "base_url": "https://api.example.com/v1",
+    "api_keys": ["sk-YOUR_KEY_HERE"],
+    "enabled": true,
+    "is_default": false,
+    "key_switch_strategy": "every_request",
+    "rate_limit_type": "unlimited",
+    "rate_limit_value": 0,
+    "switch_threshold": 0,
+    "models": [
+      {"id": "model-name", "name": "Model Display Name"}
+    ]
+  }
+]
