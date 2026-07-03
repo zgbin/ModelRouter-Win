@@ -70,7 +70,10 @@ class SpeedTester:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(url, json=body, headers=headers) as resp:
                     if resp.status != 200:
+                        ttft_ms = (time.time() - start_time) * 1000
+                        error_body = await resp.text()
                         error_label = {
+                            400: "400 请求错误",
                             429: "429 限流",
                             404: "404 未找到",
                             401: "401 认证失败",
@@ -79,8 +82,7 @@ class SpeedTester:
                             502: "502 网关错误",
                             503: "503 服务不可用",
                         }.get(resp.status, f"HTTP {resp.status}")
-                        ttft_ms = (time.time() - start_time) * 1000
-                        await resp.read()
+                        logger.warning("测速 %s 失败: %s - %s", model_id, error_label, error_body[:200])
                         return SpeedTestResult(
                             model_id=model_id,
                             response_time=ttft_ms,

@@ -380,9 +380,9 @@ async function refreshDashboard() {
         <tbody>
         ${g.models.map(m => {
           const isCurrent = m.id === currentModel;
-          const rt = m.status && m.status.avg_response_time != null ? m.status.avg_response_time : null;
+          const rt = m.status && m.status.response_time != null ? m.status.response_time : null;
           const rtText = rt != null && rt >= 0 ? Math.round(rt) + 'ms' : '-';
-          const reqs = m.status ? m.status.total_requests || 0 : 0;
+          const reqs = m.status ? m.status.requests || 0 : 0;
           const healthy = m.status ? m.status.is_healthy : null;
           return `<tr>
             <td>${esc(m.name || m.id)}</td>

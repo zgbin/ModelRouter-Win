@@ -397,7 +397,7 @@ class _WebConsole:
         try:
             group_name = request.match_info["name"]
             body = await request.json()
-            model_id = body.get("id", "")
+            model_id = body.get("id", "") or body.get("model_id", "")
 
             if not model_id:
                 return self._json_error("bad_request", "id 必填", 400)
