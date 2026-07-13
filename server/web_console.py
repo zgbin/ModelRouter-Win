@@ -812,17 +812,20 @@ class _WebConsole:
                         )
                     data = await resp.json()
                     model_list = data.get("data", [])
-                    models = []
+                    provider_models = []
                     for item in model_list:
                         if isinstance(item, dict):
                             mid = item.get("id")
                             if mid:
-                                models.append({
-                                    "id": mid,
-                                    "name": item.get("id", mid),
-                                    "owned_by": item.get("owned_by", ""),
-                                })
+                                provider_models.append(ProviderModel(
+                                    id=mid,
+                                    name=item.get("id", mid),
+                                ))
 
+                    provider.models = provider_models
+                    provider_manager.update_provider(provider)
+
+                    models = [{"id": m.id, "name": m.name} for m in provider_models]
                     return self._json_ok({"models": models, "count": len(models)})
         except asyncio.TimeoutError:
             return self._json_error("timeout_error", "获取模型列表超时", 504)
