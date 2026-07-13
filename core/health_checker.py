@@ -48,9 +48,19 @@ class _HealthChecker:
         # Build model -> providerId map from config
         model_provider_map: dict[str, str] = {}
         for group in config_manager.get_all_groups():
-            for model in group.get("models", []):
-                model_id = model if isinstance(model, str) else model.get("id", model)
-                provider_id = group.get("providerId", "nvidia")
+            group_models = getattr(group, "models", None)
+            if not isinstance(group_models, list):
+                continue
+            for model in group_models:
+                if hasattr(model, "id"):
+                    model_id = model.id
+                    provider_id = getattr(model, "provider_id", None) or "nvidia"
+                elif isinstance(model, dict):
+                    model_id = model.get("id") or str(model)
+                    provider_id = model.get("provider_id") or "nvidia"
+                else:
+                    model_id = str(model)
+                    provider_id = "nvidia"
                 model_provider_map[model_id] = provider_id
 
         for model_id in models:
