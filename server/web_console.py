@@ -85,6 +85,7 @@ class _WebConsole:
         # ---- System APIs ----
         app.router.add_post("/api/console/reload", self.handle_reload)
         app.router.add_get("/api/console/version", self.handle_version)
+        app.router.add_post("/api/console/chat", self.handle_chat)
 
         # ---- 静态文件服务 ----
         if os.path.isdir(_WEB_DIR):
@@ -210,6 +211,7 @@ class _WebConsole:
                     "total_calls": stats_manager.get_total_calls(),
                     "total_errors": stats_manager.get_total_errors(),
                     "group_stats": group_stats,
+                    "recent_errors": stats_manager.get_recent_errors(5),
                 },
                 "lock_status": {
                     "locked_models": locked_models,
@@ -854,6 +856,69 @@ class _WebConsole:
             "version": "4.1",
             "platform": "windows",
         })
+
+    async def handle_chat(self, request: web.Request) -> web.Response:
+        """POST /api/console/chat - 聊天接口，直接转发到上游提供商"""
+        body = await request.json()
+        model_id = body.get("model_id", "")
+        messages = body.get("messages", [])
+
+        if not model_id:
+            return self._json_error("bad_request", "model_id 必填", 400)
+        if not messages:
+            return self._json_error("bad_request", "messages 必填", 400)
+
+        # Find provider for model
+        provider_id = "nvidia"
+        for g in config_manager.get_all_groups():
+            for m in g.models:
+                if m.id == model_id:
+                    provider_id = m.provider_id
+                    break
+
+        provider = provider_manager.get_provider(provider_id)
+        if not provider:
+            return self._json_error("not_found", f"Provider '{provider_id}' 未找到", 404)
+
+        api_key = provider.api_keys[0] if provider.api_keys else ""
+        if not api_key:
+            return self._json_error("auth_error", f"Provider '{provider_id}' 无可用 API Key", 401)
+
+        url = f"{provider.base_url.rstrip('/')}/chat/completions"
+        req_body = {
+            "model": model_id,
+            "messages": messages,
+            "max_tokens": body.get("max_tokens", 4096),
+            "temperature": body.get("temperature", 0.7),
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        timeout = aiohttp.ClientTimeout(total=120, connect=30)
+
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(url, json=req_body, headers=headers) as resp:
+                    resp_text = await resp.text()
+                    if resp.status != 200:
+                        return self._json_error(
+                            "upstream_error",
+                            f"HTTP {resp.status}: {resp_text[:300]}",
+                            502,
+                        )
+                    return web.Response(
+                        status=200,
+                        content_type="application/json",
+                        text=resp_text,
+                    )
+        except aiohttp.ClientConnectorError:
+            return self._json_error("connection_error", "连接提供商失败", 502)
+        except asyncio.TimeoutError:
+            return self._json_error("timeout_error", "请求超时", 504)
+        except Exception as e:
+            logger.exception("Chat API error")
+            return self._json_error("api_error", str(e), 500)
 
     # ================================================================
     # 静态文件服务

@@ -177,6 +177,21 @@ a{color:var(--highlight);text-decoration:none}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+
+/* Error popover */
+.stat-card-wrapper{flex:1;position:relative;min-width:0}
+.stat-card-wrapper .stat-card{width:100%}
+.error-popover{display:none;position:absolute;top:100%;left:0;z-index:500;min-width:340px;max-width:420px;margin-top:6px;background:var(--card);border:1px solid var(--highlight);border-radius:var(--radius);box-shadow:0 6px 24px rgba(0,0,0,.5);padding:0;overflow:hidden}
+.error-popover.show{display:block}
+.error-popover-header{padding:8px 12px;background:rgba(233,69,96,.12);border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--highlight)}
+.error-popover-list{max-height:200px;overflow-y:auto;padding:0}
+.error-popover-item{padding:8px 12px;border-bottom:1px solid rgba(30,58,95,.3);font-size:11px;line-height:1.5}
+.error-popover-item:last-child{border-bottom:none}
+.error-popover-item .ep-time{color:var(--text-muted);font-family:monospace;margin-right:6px}
+.error-popover-item .ep-model{color:var(--highlight);font-weight:600;margin-right:6px}
+.error-popover-item .ep-msg{color:var(--text)}
+.error-popover-empty{padding:16px;text-align:center;color:var(--text-muted);font-size:12px}
+.stat-card-wrapper.clickable{cursor:pointer}
 </style>
 </head>
 <body>
@@ -200,6 +215,10 @@ a{color:var(--highlight);text-decoration:none}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
         <span>Providers</span>
       </div>
+      <div class="nav-item" data-tab="chat" onclick="switchTab('chat')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Chat</span>
+      </div>
     </div>
   </div>
 
@@ -209,7 +228,13 @@ a{color:var(--highlight);text-decoration:none}
     <div id="tab-dashboard" class="tab-content active">
       <div class="stats-bar" id="stats-bar">
         <div class="stat-card"><div class="stat-icon calls">&#128172;</div><div class="stat-info"><span class="stat-value" id="total-calls">0</span><span class="stat-label">Total Calls</span></div></div>
-        <div class="stat-card"><div class="stat-icon errors">&#9888;</div><div class="stat-info"><span class="stat-value" id="total-errors">0</span><span class="stat-label">Total Errors</span></div></div>
+        <div class="stat-card-wrapper clickable" id="errors-card-wrapper" onclick="toggleErrorPopover(event)">
+          <div class="stat-card"><div class="stat-icon errors">&#9888;</div><div class="stat-info"><span class="stat-value" id="total-errors">0</span><span class="stat-label">Total Errors</span></div></div>
+          <div class="error-popover" id="error-popover">
+            <div class="error-popover-header">Recent Errors</div>
+            <div class="error-popover-list" id="error-popover-list"></div>
+          </div>
+        </div>
         <div class="stat-card"><div class="stat-icon conn">&#128279;</div><div class="stat-info"><span class="stat-value" id="active-conn">0</span><span class="stat-label">Active Connections</span></div></div>
       </div>
       <div id="lock-status-section" class="lock-section" style="display:none">
@@ -238,6 +263,22 @@ a{color:var(--highlight);text-decoration:none}
         <button class="btn btn-primary" onclick="showAddProviderModal()">+ Add Provider</button>
       </div>
       <div id="providers-list"></div>
+    </div>
+
+    <!-- Chat Tab -->
+    <div id="tab-chat" class="tab-content">
+      <div style="display:flex;height:calc(100vh - 120px);flex-direction:column">
+        <div style="display:flex;gap:10px;align-items:center;padding:8px 0;margin-bottom:10px;flex-shrink:0">
+          <select id="chat-model" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-size:12px;font-family:inherit;min-width:200px"></select>
+          <button class="btn btn-sm" onclick="loadChatModels()" title="Refresh models">&#8635;</button>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:auto" id="chat-status"></span>
+        </div>
+        <div id="chat-messages" style="flex:1;overflow-y:auto;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px"></div>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          <textarea id="chat-input" rows="3" placeholder="Type your message... (Shift+Enter for new line)" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:var(--radius);font-size:13px;font-family:inherit;resize:none" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage()}"></textarea>
+          <button class="btn btn-primary" onclick="sendChatMessage()" id="chat-send-btn" style="align-self:flex-end;padding:10px 20px">Send</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -272,6 +313,7 @@ function switchTab(tab) {
   if (tab === 'dashboard') refreshDashboard();
   else if (tab === 'config') refreshConfig();
   else if (tab === 'providers') refreshProviders();
+  else if (tab === 'chat' && !window._chatInited) { initChat(); window._chatInited = true; }
 }
 
 // ============================================================
@@ -328,6 +370,44 @@ function enabledBadge(enabled) {
 }
 
 // ============================================================
+// Error popover (最近错误弹出框)
+// ============================================================
+window._recentErrors = [];
+window._errorPopoverVisible = false;
+
+function renderErrorPopover(errors) {
+  const listEl = document.getElementById('error-popover-list');
+  if (!listEl) return;
+  if (!errors || errors.length === 0) {
+    listEl.innerHTML = '<div class="error-popover-empty">No recent errors</div>';
+    return;
+  }
+  listEl.innerHTML = errors.map(e =>
+    `<div class="error-popover-item"><span class="ep-time">${esc(e.timestamp || '')}</span><span class="ep-model">${esc(e.model_id || '')}</span><span class="ep-msg">${esc(e.error || '未知错误')}</span></div>`
+  ).join('');
+}
+
+function toggleErrorPopover(event) {
+  event.stopPropagation();
+  const popover = document.getElementById('error-popover');
+  if (!popover) return;
+  window._errorPopoverVisible = !window._errorPopoverVisible;
+  popover.classList.toggle('show', window._errorPopoverVisible);
+}
+
+// 点击其他区域关闭弹出框
+document.addEventListener('click', function(e) {
+  if (window._errorPopoverVisible) {
+    const wrapper = document.getElementById('errors-card-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+      window._errorPopoverVisible = false;
+      const popover = document.getElementById('error-popover');
+      if (popover) popover.classList.remove('show');
+    }
+  }
+});
+
+// ============================================================
 // DASHBOARD
 // ============================================================
 async function refreshDashboard() {
@@ -339,6 +419,11 @@ async function refreshDashboard() {
   document.getElementById('total-errors').textContent = stats.total_errors || 0;
   const totalConn = Object.values(data.active_connections || {}).reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
   document.getElementById('active-conn').textContent = totalConn;
+
+  // Recent errors - 更新错误弹出框内容
+  const recentErrors = stats.recent_errors || [];
+  window._recentErrors = recentErrors;
+  renderErrorPopover(recentErrors);
 
   // Lock status
   const lockStatus = data.lock_status || {};
@@ -490,7 +575,7 @@ async function refreshConfig() {
             <td>${esc(m.name)}</td>
             <td style="font-family:monospace;font-size:11px">${esc(m.id)}</td>
             <td>${esc(m.provider_id || m.provider)}</td>
-            <td>${m.timeout}s</td>
+            <td>${m.timeout}s <button class="btn btn-sm" style="margin-left:4px" onclick="editModelTimeout('${esc(g.name)}','${esc(m.id)}',${m.timeout})">&#9998;</button></td>
             <td><label class="toggle"><input type="checkbox" ${m.enabled ? 'checked' : ''} onchange="toggleModel('${esc(g.name)}','${esc(m.id)}',this.checked)"><span class="slider"></span></label></td>
             <td><button class="btn btn-sm btn-danger" onclick="deleteModel('${esc(g.name)}','${esc(m.id)}')">&#128465;</button></td>
           </tr>`).join('')}
@@ -570,8 +655,25 @@ async function toggleModel(groupName, modelId, enabled) {
   await api('/api/console/groups/' + encodeURIComponent(groupName) + '/models/' + encodeURIComponent(modelId) + '/toggle', 'POST', { enabled });
 }
 
+async function editModelTimeout(groupName, modelId, currentTimeout) {
+  const newTimeout = prompt('Set timeout (seconds):', currentTimeout);
+  if (newTimeout === null) return;
+  const timeout = parseInt(newTimeout, 10);
+  if (isNaN(timeout) || timeout <= 0) {
+    toast('Invalid timeout', 'error');
+    return;
+  }
+  await api('/api/console/groups/' + encodeURIComponent(groupName) + '/models/' + encodeURIComponent(modelId), 'PUT', { timeout });
+  toast('Timeout updated', 'success');
+  refreshConfig();
+}
+
 async function saveConfig() {
-  toast('Configuration saved', 'success');
+  const data = await api('/api/console/groups');
+  if (!data) return;
+  const result = await api('/api/console/save_groups', 'POST', { groups: data.groups || [] });
+  if (result) toast('Configuration saved and reloaded', 'success');
+  else toast('Failed to save configuration', 'error');
 }
 
 // ============================================================
@@ -690,7 +792,7 @@ async function updateRateLimit(providerId, el) {
 }
 
 async function updateKeyStrategy(providerId, strategy) {
-  await api('/api/console/providers/' + encodeURIComponent(providerId) + '/key_strategy', 'PUT', { key_switch_strategy: strategy });
+  await api('/api/console/providers/' + encodeURIComponent(providerId) + '/key_strategy', 'PUT', { strategy });
   toast('Strategy updated', 'success');
 }
 
@@ -763,16 +865,14 @@ async function doEditProvider(providerId) {
   const base_url = document.getElementById('edit-prov-url').value.trim();
   const enabled = document.getElementById('edit-prov-enabled').checked;
   closeModal();
-  // Update base_url separately
-  if (base_url) await api('/api/console/providers/' + encodeURIComponent(providerId) + '/base_url', 'PUT', { base_url });
-  // Update name and enabled via full update
-  const p = providersCache.find(x => x.id === providerId);
-  if (p) {
-    const result = await api('/api/console/providers/' + encodeURIComponent(providerId), 'PUT', {
-      ...p, name, enabled
-    });
-    if (result) { toast('Provider updated', 'success'); refreshProviders(); }
-  }
+
+  const updateData = {};
+  if (name) updateData.name = name;
+  if (base_url) updateData.base_url = base_url;
+  updateData.enabled = enabled;
+
+  const result = await api('/api/console/providers/' + encodeURIComponent(providerId), 'PUT', updateData);
+  if (result) { toast('Provider updated', 'success'); refreshProviders(); }
 }
 
 async function deleteProvider(providerId) {
@@ -789,6 +889,94 @@ function esc(str) {
   const d = document.createElement('div');
   d.textContent = String(str);
   return d.innerHTML;
+}
+
+// ============================================================
+// CHAT
+// ============================================================
+let chatHistory = [];
+let chatModels = [];
+
+async function initChat() {
+  if (!window._chatInited) {
+    document.getElementById('chat-messages').innerHTML = '';
+    document.getElementById('chat-input').value = '';
+    document.getElementById('chat-status').textContent = '';
+    chatHistory = [];
+  }
+  await loadChatModels();
+}
+
+async function loadChatModels() {
+  const data = await api('/api/console/dashboard');
+  if (!data || !data.groups) return;
+  chatModels = [];
+  for (const g of data.groups) {
+    if (!g.enabled) continue;
+    for (const m of g.models) {
+      if (!m.enabled) continue;
+      chatModels.push({ id: m.id, name: m.name || m.id, group: g.name, provider_id: m.provider_id });
+    }
+  }
+  const sel = document.getElementById('chat-model');
+  sel.innerHTML = chatModels.map(m => `<option value="${esc(m.id)}">${esc(m.name)} (${esc(m.group)})</option>`).join('');
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  
+  const modelId = document.getElementById('chat-model').value;
+  if (!modelId) { toast('Please select a model', 'error'); return; }
+  
+  input.value = '';
+  const sendBtn = document.getElementById('chat-send-btn');
+  sendBtn.disabled = true;
+  sendBtn.textContent = 'Sending...';
+  document.getElementById('chat-status').textContent = 'Thinking...';
+  
+  // Add user message
+  addChatBubble('user', msg);
+  
+  try {
+    const result = await api('/api/console/chat', 'POST', {
+      model_id: modelId, messages: [{ role: 'user', content: msg }]
+    });
+    
+    if (result && result.choices && result.choices.length > 0) {
+      const content = result.choices[0].message.content || '(empty response)';
+      const usedModel = result.model || modelId;
+      document.getElementById('chat-status').textContent = 'Model: ' + usedModel;
+      addChatBubble('assistant', content);
+    } else if (result && result.error) {
+      addChatBubble('error', 'Error: ' + (result.error.message || JSON.stringify(result.error)));
+    }
+  } catch (e) {
+    addChatBubble('error', 'Request failed: ' + e.message);
+    document.getElementById('chat-status').textContent = 'Error';
+  }
+  
+  sendBtn.disabled = false;
+  sendBtn.textContent = 'Send';
+}
+
+function addChatBubble(role, content) {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  const isUser = role === 'user';
+  const isError = role === 'error';
+  
+  div.style.cssText = `
+    margin-bottom:12px;padding:10px 14px;border-radius:8px;max-width:85%;
+    font-size:13px;line-height:1.5;word-wrap:break-word;
+    ${isUser ? 'margin-left:auto;background:rgba(15,52,96,.6);border:1px solid var(--border);' : ''}
+    ${isError ? 'background:rgba(244,67,54,.1);border:1px solid var(--red);color:var(--red);' : ''}
+    ${!isUser && !isError ? 'background:rgba(30,58,95,.3);border:1px solid var(--border);' : ''}
+  `;
+  div.innerHTML = '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">' + esc(isUser ? 'You' : 'Assistant') + '</div>' + content;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
 }
 
 // ============================================================

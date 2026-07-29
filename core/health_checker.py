@@ -66,11 +66,11 @@ class _HealthChecker:
         for model_id in models:
             provider_id = model_provider_map.get(model_id, "nvidia")
             try:
-                success, response_time = await self._speed_tester.test_model(model_id, provider_id)
-                if success:
+                result = await self._speed_tester.test_model(model_id, provider_id)
+                if result.success:
                     router_state.clear_model_error(model_id)
-                    router_state.update_speed_test_result(model_id, response_time)
-                    logger.info("Health check passed for model %s (response_time=%.2fs)", model_id, response_time)
+                    router_state.update_speed_test_result(model_id, int(result.response_time))
+                    logger.info("Health check passed for model %s (response_time=%.0fms)", model_id, result.response_time)
                 else:
                     router_state.record_health_check_failure(model_id)
                     logger.warning("Health check failed for model %s", model_id)

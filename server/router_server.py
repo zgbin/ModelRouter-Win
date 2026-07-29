@@ -171,7 +171,6 @@ class _RouterServer:
                             is_early_rate_limit = True
                     if not is_early_rate_limit:
                         if "error" in parsed:
-                            stats_manager.record_call(model_id, False)
                             error_msg = (
                                 parsed.get("error", {}).get("message", "unknown")
                                 if isinstance(parsed.get("error"), dict)
@@ -182,6 +181,7 @@ class _RouterServer:
                                 if isinstance(parsed.get("error"), dict)
                                 else ""
                             )
+                            stats_manager.record_call(model_id, False, f"上游错误: {error_msg}")
                             router_state.update_model_error(
                                 model_id, f"上游错误: {error_msg}"
                             )
@@ -194,7 +194,7 @@ class _RouterServer:
                             )
                             continue
                         if "choices" not in parsed:
-                            stats_manager.record_call(model_id, False)
+                            stats_manager.record_call(model_id, False, "上游响应无 choices")
                             return self._json_error(
                                 "api_error",
                                 "Invalid response format from upstream: missing choices",
@@ -226,7 +226,7 @@ class _RouterServer:
                 )
                 if model_id is not None:
                     try:
-                        stats_manager.record_call(model_id, False)
+                        stats_manager.record_call(model_id, False, f"异常: {e}")
                     except Exception:
                         pass
                     router_state.update_model_error(model_id, f"异常: {e}")
@@ -336,12 +336,12 @@ class _RouterServer:
                     )
 
                 if "error" in response_obj:
-                    stats_manager.record_call(model_id, False)
                     error_msg = (
                         response_obj.get("error", {}).get("message", "unknown")
                         if isinstance(response_obj.get("error"), dict)
                         else "unknown"
                     )
+                    stats_manager.record_call(model_id, False, f"上游错误: {error_msg}")
                     router_state.update_model_error(model_id, f"上游错误: {error_msg}")
                     if router_state.get_locked_model(group) == model_id:
                         router_state.unlock_group(group)
@@ -353,7 +353,7 @@ class _RouterServer:
 
                 choices = response_obj.get("choices")
                 if not choices or not isinstance(choices, list) or len(choices) == 0:
-                    stats_manager.record_call(model_id, False)
+                    stats_manager.record_call(model_id, False, "上游响应无 choices")
                     return self._anthropic_error(
                         "api_error", "No choices in upstream response"
                     )
@@ -374,7 +374,7 @@ class _RouterServer:
                 )
                 if model_id is not None:
                     try:
-                        stats_manager.record_call(model_id, False)
+                        stats_manager.record_call(model_id, False, f"异常: {e}")
                     except Exception:
                         pass
                     router_state.update_model_error(model_id, f"异常: {e}")
@@ -526,7 +526,7 @@ class _RouterServer:
                                     upstream_resp.status,
                                     error_body[:200],
                                 )
-                            stats_manager.record_call(model_id, False)
+                            stats_manager.record_call(model_id, False, f"HTTP {upstream_resp.status}")
                             router_state.update_model_error(
                                 model_id, f"HTTP {upstream_resp.status}"
                             )
@@ -576,7 +576,7 @@ class _RouterServer:
                             model_id,
                         )
                         try:
-                            stats_manager.record_call(model_id, False)
+                            stats_manager.record_call(model_id, False, "超时")
                         except Exception:
                             pass
                         router_state.update_model_error(model_id, "超时")
@@ -590,7 +590,7 @@ class _RouterServer:
                             model_id,
                         )
                         try:
-                            stats_manager.record_call(model_id, False)
+                            stats_manager.record_call(model_id, False, "连接失败")
                         except Exception:
                             pass
                         router_state.update_model_error(model_id, "连接失败")
@@ -1103,7 +1103,7 @@ class _RouterServer:
                                     upstream_resp.status,
                                     error_body[:200],
                                 )
-                            stats_manager.record_call(model_id, False)
+                            stats_manager.record_call(model_id, False, f"HTTP {upstream_resp.status}")
                             router_state.update_model_error(
                                 model_id, f"HTTP {upstream_resp.status}"
                             )
@@ -1158,21 +1158,21 @@ class _RouterServer:
                             model_id,
                         )
                         try:
-                            stats_manager.record_call(model_id, False)
+                            stats_manager.record_call(model_id, False, "超时")
                         except Exception:
                             pass
                         router_state.update_model_error(model_id, "超时")
                         if router_state.get_locked_model(group) == model_id:
                             router_state.unlock_group(group)
-                        switch_model = True
-                        break
+                            switch_model = True
+                            break
                     except (aiohttp.ClientConnectorError, aiohttp.ClientError):
                         logger.warning(
                             "Stream connection error on model %s, switching to next model",
                             model_id,
                         )
                         try:
-                            stats_manager.record_call(model_id, False)
+                            stats_manager.record_call(model_id, False, "连接失败")
                         except Exception:
                             pass
                         router_state.update_model_error(model_id, "连接失败")
