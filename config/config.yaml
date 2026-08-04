@@ -1,0 +1,163 @@
+api_keys:
+  speed_test:
+    key: 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
+  work:
+  - key: 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
+    name: key-1
+    rate_limit_per_minute: 35
+  - key: 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
+    name: key-2
+    rate_limit_per_minute: 35
+  - key: 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
+    name: key-3
+    rate_limit_per_minute: 35
+base_url: https://integrate.api.nvidia.com/v1
+dashboard:
+  enabled: true
+  port: 8100
+  response_time_window: 20
+models:
+  groups:
+  - description: 通用对话和问答(全部支持tools)
+    models:
+    - id: qwen/qwen3-next-80b-a3b-instruct
+      name: Qwen3 Next 80B (最快)
+      priority: 1
+      provider: nvidia
+      timeout: 30
+    - id: nvidia/llama-3.3-nemotron-super-49b-v1
+      name: Nemotron Super 49B
+      priority: 2
+      provider: nvidia
+      timeout: 30
+    - id: minimaxai/minimax-m2.5
+      name: MiniMax M2.5
+      priority: 3
+      provider: nvidia
+      timeout: 60
+    - id: stepfun-ai/step-3.5-flash
+      name: Step 3.5 Flash
+      priority: 4
+      provider: nvidia
+      timeout: 30
+    - id: meta/llama-3.1-70b-instruct
+      name: Llama 3.1 70B Instruct
+      provider: nvidia
+      timeout: 60
+    name: 综合对话组
+    port: 8190
+  - description: 代码生成、审查、调试(全部支持tools)
+    models:
+    - id: qwen/qwen3-coder-480b-a35b-instruct
+      name: Qwen3 Coder 480B (代码最强)
+      priority: 1
+      provider: nvidia
+      timeout: 90
+    - id: z-ai/glm-5.1
+      name: glm5.1
+      priority: 2
+      provider: nvidia
+      timeout: 60
+    - id: minimaxai/minimax-m2.5
+      name: MiniMax M2.5
+      provider: nvidia
+      timeout: 60
+    - id: minimaxai/minimax-m2.7
+      name: MiniMax M2.7
+      provider: nvidia
+      timeout: 60
+    - id: z-ai/glm5
+      name: glm5
+      provider: nvidia
+      timeout: 60
+    name: 代码组
+    port: 8191
+  - description: 复杂任务处理(全部支持tools)
+    models:
+    - id: meta/llama-3.1-405b-instruct
+      name: Llama 3.1 405B Instruct
+      priority: 1
+      provider: nvidia
+      timeout: 90
+    - id: nvidia/llama-3.3-nemotron-super-49b-v1
+      name: Llama 3.3 Nemotron Super 49B V1
+      priority: 2
+      provider: nvidia
+      timeout: 60
+    - id: qwen/qwen3-next-80b-a3b-instruct
+      name: Qwen3 Next 80B
+      provider: nvidia
+      timeout: 60
+    - id: meta/llama-3.1-405b-instruct
+      name: Llama 3.1 405B Instruct (备用)
+      provider: nvidia
+      timeout: 90
+    name: 复杂组
+    port: 8192
+  - description: 图像解析(全部支持tools)
+    models:
+    - id: qwen/qwen3-next-80b-a3b-instruct
+      name: Qwen3 Next 80B
+      priority: 1
+      provider: nvidia
+      timeout: 60
+    - id: stepfun-ai/step-3.5-flash
+      name: Step 3.5 Flash
+      priority: 2
+      provider: nvidia
+      timeout: 60
+    - id: minimaxai/minimax-m2.5
+      name: MiniMax M2.5
+      provider: nvidia
+      timeout: 60
+    name: 图像组
+    port: 8193
+  - description: 语音处理(全部支持tools)
+    models:
+    - id: qwen/qwen3-next-80b-a3b-instruct
+      name: Qwen3 Next 80B
+      provider: nvidia
+      timeout: 60
+    - id: minimaxai/minimax-m2.5
+      name: MiniMax M2.5
+      provider: nvidia
+      timeout: 60
+    - id: stepfun-ai/step-3.5-flash
+      name: Step 3.5 Flash
+      provider: nvidia
+      timeout: 60
+    name: 语音处理
+    port: 8194
+  - description: 备用大模型，默认不启用
+    enabled: false
+    is_backup: true
+    models:
+    - api_key: sk-PLACEHOLDER
+      enabled: false
+      id: gpt-4o
+      name: GPT-4o (备用)
+      priority: 1
+      provider: openai
+      timeout: 60
+    - api_key: sk-ant-PLACEHOLDER
+      enabled: false
+      id: claude-3-5-sonnet
+      name: Claude 3.5 Sonnet (备用)
+      priority: 2
+      provider: anthropic
+      timeout: 60
+    name: 备用大模型组
+    port: 8190
+monitoring:
+  enabled: true
+  log_level: INFO
+server:
+  health_check_interval: 30
+  host: 0.0.0.0
+  port_range:
+  - 8190
+  - 8194
+speed_test:
+  interval: 300
+  max_tokens: 5
+  timeout_threshold: 45

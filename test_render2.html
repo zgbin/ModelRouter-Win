@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Chat Markdown 渲染验证</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#1a1a2e;--card:#16213e;--accent:#0f3460;--highlight:#e94560;
+  --text:#e0e0e0;--text-muted:#8892a4;--border:#1e3a5f;
+  --green:#4caf50;--red:#f44336;--yellow:#ff9800;--gray:#607d8b;
+  --radius:8px;--shadow:0 2px 8px rgba(0,0,0,.3);
+}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;padding:24px}
+.chat-md table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12px}
+.chat-md th,.chat-md td{border:1px solid var(--border);padding:6px 10px;text-align:left}
+.chat-md th{background:rgba(15,52,96,.4);font-weight:600}
+.chat-md tr:nth-child(even){background:rgba(15,52,96,.1)}
+.chat-md pre{background:rgba(10,10,30,.6);border:1px solid var(--border);border-radius:6px;padding:10px 12px;overflow-x:auto;margin:6px 0}
+.chat-md code{font-family:'Cascadia Code',Consolas,monospace;font-size:12px}
+.chat-md :not(pre)>code{background:rgba(233,69,96,.1);border:1px solid rgba(233,69,96,.2);border-radius:3px;padding:1px 4px;color:#e94560}
+.chat-md p{margin:4px 0}
+.chat-md ul,.chat-md ol{margin:4px 0;padding-left:20px}
+.chat-md li{margin:2px 0}
+.chat-md blockquote{border-left:3px solid var(--highlight);padding-left:12px;color:var(--text-muted);margin:6px 0}
+.chat-md h1,.chat-md h2,.chat-md h3,.chat-md h4{margin:8px 0 4px;font-size:14px;color:var(--text)}
+.chat-md hr{border:none;border-top:1px solid var(--border);margin:10px 0}
+.test-result{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.test-result h2{font-size:14px;color:var(--highlight);margin-bottom:8px}
+</style>
+</head>
+<body>
+<h1 style="color:var(--highlight);margin-bottom:16px">Chat 页面 Markdown 渲染验证</h1>
+
+<div class="test-result">
+  <h2>测试结果1：嵌套表格（项目-模块-任务三层结构）</h2>
+  <div class="chat-md" id="test1"></div>
+</div>
+
+<div class="test-result">
+  <h2>测试结果2：代码块 + 表格混合</h2>
+  <div class="chat-md" id="test2"></div>
+</div>
+
+<div class="test-result">
+  <h2>测试结果3：复杂嵌套（多层表格 + 引用 + 列表）</h2>
+  <div class="chat-md" id="test3"></div>
+</div>
+
+<script>
+// 测试数据1：嵌套表格
+const md1 = `
+# 项目数据结构展示
+
+## 项目概览
+
+| 项目名称 | 模块名称 | 状态 |
+|---------|---------|------|
+| 🚀 Alpha平台 | 用户认证模块 | 进行中 |
+| 🚀 Alpha平台 | 支付网关模块 | 未开始 |
+| 📦 Beta应用 | 前端界面模块 | 进行中 |
+
+---
+
+## 任务详情
+
+### 🚀 Alpha平台
+
+#### 用户认证模块
+| 任务ID | 任务名称 | 负责人 | 截止日期 | 状态 |
+|--------|---------|--------|---------|------|
+| A001 | 登录接口开发 | 张三 | 2026-08-15 | 已完成 |
+| A002 | 注册流程优化 | 李四 | 2026-08-20 | 进行中 |
+
+#### 支付网关模块
+| 任务ID | 任务名称 | 负责人 | 截止日期 | 状态 |
+|--------|---------|--------|---------|------|
+| A004 | 支付宝对接 | 赵六 | 2026-09-01 | 未开始 |
+| A005 | 微信支付集成 | 钱七 | 2026-09-05 | 未开始 |
+`;
+
+// 测试数据2：代码块 + 表格
+const md2 = `
+## 数据分析结果
+
+以下是Python代码示例：
+
+\`\`\`python
+import pandas as pd
+df = pd.read_csv('data.csv')
+result = df.groupby('category').mean()
+\`\`\`
+
+### 结果汇总表
+
+| 指标 | 数值 | 变化率 |
+|------|------|--------|
+| 总用户数 | 12,345 | +5.2% |
+| 活跃度 | 78.5% | -1.3% |
+| 收入 | ¥1,234,567 | +8.7% |
+`;
+
+// 测试数据3：复杂嵌套
+const md3 = `
+# 深度分析
+
+## 关键发现
+
+1. **项目A** 完成了核心功能开发
+2. **项目B** 进度延迟 2 周
+3. **项目C** 资源投入超出预期
+
+### 详细对比
+
+| 维度 | 项目A | 项目B | 项目C |
+|------|-------|-------|-------|
+| 预算使用率 | 85% | 120% | 60% |
+| 人员投入 | 12人 | 8人 | 5人 |
+| 风险等级 | 低 | 高 | 中 |
+
+> 注意：项目B的风险主要来源于人员流动，需重点关注。
+
+### 风险矩阵
+
+| 风险类型 | 影响程度 | 发生概率 | 应对措施 |
+|----------|----------|----------|----------|
+| 技术风险 | 高 | 中 | 增加测试轮次 |
+| 人员风险 | 中 | 高 | 建立备份机制 |
+| 时间风险 | 低 | 低 | 预留缓冲时间 |
+`;
+
+document.getElementById('test1').innerHTML = marked.parse(md1);
+document.getElementById('test2').innerHTML = marked.parse(md2);
+document.getElementById('test3').innerHTML = marked.parse(md3);
+</script>
+</body>
+</html>

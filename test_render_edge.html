@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Chat Markdown 特殊字符验证</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#1a1a2e;--card:#16213e;--accent:#0f3460;--highlight:#e94560;
+  --text:#e0e0e0;--text-muted:#8892a4;--border:#1e3a5f;
+  --green:#4caf50;--red:#f44336;--yellow:#ff9800;--gray:#607d8b;
+  --radius:8px;--shadow:0 2px 8px rgba(0,0,0,.3);
+}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;padding:24px}
+.chat-md table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12px}
+.chat-md th,.chat-md td{border:1px solid var(--border);padding:6px 10px;text-align:left}
+.chat-md th{background:rgba(15,52,96,.4);font-weight:600}
+.chat-md tr:nth-child(even){background:rgba(15,52,96,.1)}
+.chat-md pre{background:rgba(10,10,30,.6);border:1px solid var(--border);border-radius:6px;padding:10px 12px;overflow-x:auto;margin:6px 0}
+.chat-md code{font-family:'Cascadia Code',Consolas,monospace;font-size:12px}
+.chat-md :not(pre)>code{background:rgba(233,69,96,.1);border:1px solid rgba(233,69,96,.2);border-radius:3px;padding:1px 4px;color:#e94560}
+.chat-md p{margin:4px 0}
+.chat-md ul,.chat-md ol{margin:4px 0;padding-left:20px}
+.chat-md li{margin:2px 0}
+.chat-md blockquote{border-left:3px solid var(--highlight);padding-left:12px;color:var(--text-muted);margin:6px 0}
+.chat-md h1,.chat-md h2,.chat-md h3,.chat-md h4{margin:8px 0 4px;font-size:14px;color:var(--text)}
+.chat-md hr{border:none;border-top:1px solid var(--border);margin:10px 0}
+.test-result{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.test-result h2{font-size:14px;color:var(--highlight);margin-bottom:8px}
+.test-label{color:var(--text-muted);font-size:11px;margin-bottom:4px}
+pre.test-source{background:rgba(0,0,0,.3);padding:8px;font-size:11px;margin-bottom:8px;overflow-x:auto;color:var(--text-muted);white-space:pre-wrap}
+</style>
+</head>
+<body>
+<h1 style="color:var(--highlight);margin-bottom:16px">Chat Markdown 特殊字符&换行验证</h1>
+
+<div class="test-result">
+  <h2>测试1: 模型原始返回（含<和|特殊字符）- JSON转义后</h2>
+  <p class="test-label">Markdown原文（模型返回后用浏览器JSON.parse反序列化）：</p>
+  <pre id="src1">Loading...</pre>
+  <div class="chat-md" id="test1"></div>
+</div>
+
+<div class="test-result">
+  <h2>测试2: 重模拟 - 浏览器原生\\n换行 + 特殊字符</h2>
+  <div class="chat-md" id="test2"></div>
+</div>
+
+<div class="test-result">
+  <h2>测试3: 手动构造 - 单元格内真·换行符（Markdown <br> 标签）</h2>
+  <div class="chat-md" id="test3"></div>
+</div>
+
+<div class="test-result">
+  <h2>测试4: 手动构造 - 模拟模型可能返回的 < > |</h2>
+  <div class="chat-md" id="test4"></div>
+</div>
+
+<script>
+// 测试1: 从服务器返回的JSON中取出content（模拟浏览器 fetch 后的行为）
+fetch('http://127.0.0.1:8100/api/console/chat', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({
+    "model_id":"deepseek-ai/deepseek-v4-pro",
+    "messages":[{"role":"user","content":"只输出Markdown表格，3行数据：\n1. 第一行：姓名<Alice>，备注含|符号\n2. 第二行：备注用<br>换行\n3. 第三行：<html>标签和|竖线都存在"}],
+    "max_tokens":300
+  })
+}).then(r=>r.json()).then(data=>{
+  const choice = data.choices?.[0];
+  if (!choice) { document.getElementById('src1').textContent = 'API 错误'; document.getElementById('test1').innerHTML = 'API 错误'; return; }
+  const content = choice.message?.content || '';
+  document.getElementById('src1').textContent = content;
+  document.getElementById('test1').innerHTML = marked.parse(content);
+
+  // 同时在控制台输出分析
+  console.log('[test1] 模型返回原始content:', JSON.stringify(content));
+  console.log('[test1] 解析后的HTML:', marked.parse(content));
+});
+
+// 测试2: 手动构造（模拟浏览器 JavaScript 字符串）
+const md2 = `| 名称 | 描述 | 状态 |
+|------|------|------|
+| 张三 | 备注: 这个项目 | 完成 |
+| 李四 | 描述含 <这是标签> 文本 | 进行中 |
+| 王五 | 含HTML标签和emoji ` + "{{emoji}}" + ` | 未开始 |
+| 赵六 | 包含\\|竖线符号测试 | 进行中 |
+| Alice | 第一个<br/>换行<br/>第二个<br/>换行 | 多行 |
+| \${"<script>alert('xss')</script>"} | XSS 测试 | 进行中 |`;
+document.getElementById('test2').innerHTML = marked.parse(md2);
+
+// 测试3: 模拟模型常用的 <br> 换行 和 \\| 转义
+const md3 = `| 姓名 | 内容 |
+|------|------|
+| Alice<br>Bob<br>Charlie | 多行姓名 |
+| 张三 | 第一行<br>第二行<br>第三行 |
+| 李四 | 备注: <strong>重要</strong> |
+| 王五 | 包含 \\| 管道符 \\
+| 分隔 |`;
+document.getElementById('test3').innerHTML = marked.parse(md3);
+
+// 测试4: 验证独立的 \\| 和 <br>
+const md4 = `| 字段 | 值 |
+|------|-----|
+| XML | &lt;html&gt; | body &lt; &gt; test |
+| 管道 | 用反斜杠转义 \\| |
+| 换行 | 测试\\n换行符 |
+| 链接 | [http://test.com](http://test.com) |`;
+document.getElementById('test4').innerHTML = marked.parse(md4);
+</script>
+</body>
+</html>
