@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ModelRouter Console</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css">
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/languages/python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/languages/javascript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/languages/bash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11/languages/json.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -192,6 +199,22 @@ a{color:var(--highlight);text-decoration:none}
 .error-popover-item .ep-msg{color:var(--text)}
 .error-popover-empty{padding:16px;text-align:center;color:var(--text-muted);font-size:12px}
 .stat-card-wrapper.clickable{cursor:pointer}
+
+/* Markdown content styling */
+.chat-md table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12px}
+.chat-md th,.chat-md td{border:1px solid var(--border);padding:6px 10px;text-align:left}
+.chat-md th{background:rgba(15,52,96,.4);font-weight:600}
+.chat-md tr:nth-child(even){background:rgba(15,52,96,.1)}
+.chat-md pre{background:rgba(10,10,30,.6);border:1px solid var(--border);border-radius:6px;padding:10px 12px;overflow-x:auto;margin:6px 0}
+.chat-md code{font-family:'Cascadia Code',Consolas,monospace;font-size:12px}
+.chat-md :not(pre)>code{background:rgba(233,69,96,.1);border:1px solid rgba(233,69,96,.2);border-radius:3px;padding:1px 4px;color:#e94560}
+.chat-md p{margin:4px 0}
+.chat-md ul,.chat-md ol{margin:4px 0;padding-left:20px}
+.chat-md li{margin:2px 0}
+.chat-md blockquote{border-left:3px solid var(--highlight);padding-left:12px;color:var(--text-muted);margin:6px 0}
+.chat-md h1,.chat-md h2,.chat-md h3,.chat-md h4{margin:8px 0 4px;font-size:14px;color:var(--text)}
+.chat-md hr{border:none;border-top:1px solid var(--border);margin:10px 0}
+.chat-md img{max-width:100%;border-radius:var(--radius)}
 </style>
 </head>
 <body>
@@ -966,7 +989,7 @@ function addChatBubble(role, content) {
   const div = document.createElement('div');
   const isUser = role === 'user';
   const isError = role === 'error';
-  
+
   div.style.cssText = `
     margin-bottom:12px;padding:10px 14px;border-radius:8px;max-width:85%;
     font-size:13px;line-height:1.5;word-wrap:break-word;
@@ -974,7 +997,14 @@ function addChatBubble(role, content) {
     ${isError ? 'background:rgba(244,67,54,.1);border:1px solid var(--red);color:var(--red);' : ''}
     ${!isUser && !isError ? 'background:rgba(30,58,95,.3);border:1px solid var(--border);' : ''}
   `;
-  div.innerHTML = '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">' + esc(isUser ? 'You' : 'Assistant') + '</div>' + content;
+  const header = '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">' + esc(isUser ? 'You' : 'Assistant') + '</div>';
+  if (isUser || isError) {
+    div.innerHTML = header + esc(content);
+  } else {
+    // 使用 marked 解析 Markdown
+    const rendered = typeof marked !== 'undefined' ? marked.parse(content || '') : esc(content);
+    div.innerHTML = header + '<div class="chat-md">' + rendered + '</div>';
+  }
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
 }
