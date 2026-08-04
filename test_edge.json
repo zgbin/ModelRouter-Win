@@ -1,1 +1,0 @@
-{"model_id":"deepseek-ai/deepseek-v4-pro","messages":[{"role":"user","content":"请只输出一个Markdown表格，展示以下特殊情况：\n\n| 名称 | 描述 | 状态 |\n|------|------|------|\n| 张三 | 备注: 这个项目 | 完成 |\n| 李四 | 描述含\n换行 | 进行中 |\n| 王五 | 含<HTML>标签和emoji | 未开始 |\n| 赵六 | 包含|竖线符号测试 | 进行中 |\n\n不要额外解释，直接输出表格。"}],"max_tokens":800}

@@ -1,1 +1,0 @@
-{"model_id":"deepseek-ai/deepseek-v4-pro","messages":[{"role":"user","content":"只输出一个Markdown表格，包含以下数据：\n姓名列: Alice | Bob | Charlie <admin>\n部门列: 技术|部\n备注列: 说明\n第一行: 项目A\n第二行: 含\n换行的内容\n第三行: 含<xml>和|符号\n\n直接输出表格，不要解释。"}],"max_tokens":500}

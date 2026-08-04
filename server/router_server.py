@@ -1392,43 +1392,72 @@ class _RouterServer:
     # ================================================================
 
     async def handle_models(self, request: web.Request) -> web.Response:
-        """GET /v1/models - 返回当前端口对应分组中启用的模型列表
-
-        每个路由端口对应一个分组，只返回该分组配置的模型，
-        避免客户端看到不属于当前分组的模型。
-        """
+        """GET /v1/models - 聚合所有启用提供者的模型列表"""
         try:
-            group_name = config_manager.get_group_by_port(self.port)
-            group = None
-            for g in config_manager.get_all_groups():
-                if g.name == group_name:
-                    group = g
-                    break
+            enabled_providers = provider_manager.get_enabled_providers()
+            if not enabled_providers:
+                return self._json_error("upstream_error", "No enabled providers")
 
-            if group is None:
-                return self._json_error("upstream_error", f"Group '{group_name}' not found")
+            all_models: List[Dict[str, Any]] = []
+            fetch_errors = 0
 
-            models_data: List[Dict[str, Any]] = []
-            for m in group.models:
-                if not m.enabled:
-                    continue
-                provider_info = provider_manager.get_provider(m.provider_id)
-                models_data.append(
-                    {
-                        "id": m.id,
-                        "object": "model",
-                        "owned_by": provider_info.name if provider_info else m.provider_id,
-                        "provider": m.provider_id,
-                        "provider_name": provider_info.name if provider_info else m.provider_id,
-                    }
-                )
+            async def fetch_provider_models(provider):
+                nonlocal fetch_errors
+                api_key = provider.api_keys[0] if provider.api_keys else ""
+                if not api_key:
+                    fetch_errors += 1
+                    return
 
-            if not models_data:
+                url = f"{provider.base_url.rstrip('/')}/models"
+                headers = {"Authorization": f"Bearer {api_key}"}
+                timeout = aiohttp.ClientTimeout(total=10, connect=5)
+
+                try:
+                    async with self.session.get(
+                        url, headers=headers, timeout=timeout
+                    ) as resp:
+                        body = await resp.text()
+                        if body:
+                            try:
+                                data = json.loads(body)
+                                model_list = data.get("data", [])
+                                for item in model_list:
+                                    if isinstance(item, dict):
+                                        model_id = item.get("id")
+                                        if model_id:
+                                            all_models.append(
+                                                {
+                                                    "id": model_id,
+                                                    "object": "model",
+                                                    "owned_by": item.get(
+                                                        "owned_by", provider.name
+                                                    ),
+                                                    "provider": provider.id,
+                                                    "provider_name": provider.name,
+                                                }
+                                            )
+                            except Exception:
+                                pass
+                except Exception as e:
+                    logger.warning(
+                        "Failed to fetch models from provider %s: %s",
+                        provider.id,
+                        str(e),
+                    )
+                    fetch_errors += 1
+
+            # 并发获取所有 provider 的模型
+            await asyncio.gather(
+                *[fetch_provider_models(p) for p in enabled_providers],
+                return_exceptions=True,
+            )
+
+            if not all_models:
                 return self._json_error(
-                    "upstream_error", "No enabled models in this group"
+                    "upstream_error", "No models available from any provider"
                 )
 
-            result = {"object": "list", "data": models_data}
+            result = {"object": "list", "data": all_models}
             return self._json_ok(result)
         except Exception as e:
             logger.exception("Error fetching models")
