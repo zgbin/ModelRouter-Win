@@ -11,6 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/languages/javascript.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/languages/bash.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/languages/json.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1002,7 +1003,35 @@ function addChatBubble(role, content) {
     div.innerHTML = header + esc(content);
   } else {
     // 使用 marked 解析 Markdown
-    const rendered = typeof marked !== 'undefined' ? marked.parse(content || '') : esc(content);
+    let rendered = typeof marked !== 'undefined' ? marked.parse(content || '') : esc(content);
+    // 代码块语法高亮
+    rendered = rendered.replace(
+      /<pre><code[^>]*class="language-(\w+)"[^>]*>([\s\S]*?)<\/code><\/pre>/g,
+      (_, lang, code) => {
+        const highlighted = hljs?.highlight(code.replace(/</g, '<').replace(/>/g, '>').replace(/&/g, '&'), { language: lang })?.value ?? code;
+        return `<pre><code class="language-${esc(lang)}">${highlighted}</code></pre>`;
+      }
+    );
+    rendered = rendered.replace(
+      /<pre><code[^>]*>([\s\S]*?)<\/code><\/pre>/g,
+      (_, code) => {
+        const highlighted = hljs?.highlightAuto(code.replace(/</g, '<').replace(/>/g, '>').replace(/&/g, '&'))?.value ?? code;
+        return `<pre><code>${highlighted}</code></pre>`;
+      }
+    );
+    // DOMPurify 清理 HTML（防止 XSS，同时保留表格等安全标签）
+    if (typeof DOMPurify !== 'undefined') {
+      rendered = DOMPurify.sanitize(rendered, {
+        ALLOWED_TAGS: [
+          'p','br','h1','h2','h3','h4','h5','h6',
+          'strong','em','u','s','code','pre','blockquote',
+          'ul','ol','li','table','thead','tbody','tr','th','td',
+          'hr','img','a','span','div'
+        ],
+        ALLOWED_ATTR: ['class','style','href','src','alt','title'],
+        KEEP_CONTENT: true
+      });
+    }
     div.innerHTML = header + '<div class="chat-md">' + rendered + '</div>';
   }
   container.appendChild(div);
