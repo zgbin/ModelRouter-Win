@@ -58,6 +58,11 @@ class SpeedTester:
             "max_tokens": 5,
             "stream": True,
         }
+
+        # 推理模型需要启用 thinking 模式才能正常测速
+        if model_id == "nvidia/nemotron-3-ultra-550b-a55b":
+            body["chat_template_kwargs"] = {"enable_thinking": False}
+            body["max_tokens"] = 10
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",

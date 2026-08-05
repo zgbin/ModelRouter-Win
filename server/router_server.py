@@ -39,6 +39,17 @@ OPENAI_STANDARD_PARAMS: Set[str] = {
     "user", "tools", "tool_choice", "parallel_tool_calls",
     "response_format", "seed", "service_tier",
     "chat_template_kwargs", "repetition_penalty",
+    "reasoning_budget",  # NVIDIA Nemotron 推理预算
+}
+
+# 推理模型特殊配置：自动注入官方推荐参数
+REASONING_MODEL_DEFAULTS: Dict[str, Dict[str, Any]] = {
+    "nvidia/nemotron-3-ultra-550b-a55b": {
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "chat_template_kwargs": {"enable_thinking": True},
+        "reasoning_budget": 16384,
+    },
 }
 
 DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1"
@@ -1823,11 +1834,23 @@ class _RouterServer:
         return provider_manager.get_provider_id_for_model(model_id)
 
     def _sanitize_request_body(self, body: dict) -> dict:
-        """保留 OpenAI 标准参数，移除非标准参数"""
-        keys_to_remove = [k for k in body.keys() if k not in OPENAI_STANDARD_PARAMS]
-        if not keys_to_remove:
-            return body
+        """保留 OpenAI 标准参数，移除非标准参数，并注入推理模型默认参数"""
         cleaned = dict(body)
+
+        # 推理模型参数注入：客户端未指定的参数使用官方推荐值
+        model_id = cleaned.get("model", "")
+        if model_id in REASONING_MODEL_DEFAULTS:
+            defaults = REASONING_MODEL_DEFAULTS[model_id]
+            for key, val in defaults.items():
+                if key not in cleaned:
+                    cleaned[key] = val
+                    logger.debug(
+                        "Injected default %s=%s for reasoning model %s",
+                        key, val, model_id,
+                    )
+
+        # 移除非标准参数
+        keys_to_remove = [k for k in cleaned.keys() if k not in OPENAI_STANDARD_PARAMS]
         for key in keys_to_remove:
             logger.debug("Sanitizing non-standard param: %s", key)
             cleaned.pop(key, None)
