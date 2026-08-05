@@ -1112,9 +1112,86 @@ class _RouterServer:
                             switch_model = True
                             break
 
-                        # 成功 - 建立流式响应
+                        # 成功 - 先缓冲首个 SSE 帧验证内容合法性
+                        # 某些 provider（如 NVIDIA NIM）会返回 HTTP 200 但 SSE 内容是错误 JSON
+                        # 如 data: {"error":{"message":"ResourceExhausted..."}}
+                        # 需要在转发前检测，避免客户端收到 "empty content"
+                        start_time = time.time()
+                        first_chunk = None
+                        first_chunk_is_error = False
+                        first_chunk_received = False
+
+                        try:
+                            # 读取第一行非空数据（SSE 的 data: 行）
+                            async for raw_line in upstream_resp.content:
+                                if not raw_line or not raw_line.strip():
+                                    continue
+                                first_chunk = raw_line
+                                first_chunk_received = True
+                                # 检测是否是错误帧
+                                try:
+                                    line_str = raw_line.decode("utf-8", errors="ignore").strip()
+                                    if line_str.startswith("data:"):
+                                        payload = line_str[5:].strip()
+                                        if payload and payload != "[DONE]":
+                                            parsed = json.loads(payload)
+                                            if isinstance(parsed, dict) and "error" in parsed and "choices" not in parsed:
+                                                first_chunk_is_error = True
+                                                err_obj = parsed.get("error", {})
+                                                err_msg = err_obj.get("message", "unknown") if isinstance(err_obj, dict) else str(err_obj)
+                                                logger.warning(
+                                                    "Stream upstream returned 200 but error in SSE for model %s: %s",
+                                                    model_id, err_msg[:200]
+                                                )
+                                except (json.JSONDecodeError, UnicodeDecodeError):
+                                    pass
+                                break
+
+                            if not first_chunk_received:
+                                # 上游 200 但没有任何数据 → 视为错误，切换模型
+                                logger.warning(
+                                    "Stream upstream returned 200 but empty body for model %s, switching model",
+                                    model_id,
+                                )
+                                stats_manager.record_call(model_id, False, "空响应")
+                                router_state.update_model_error(model_id, "上游返回空流")
+                                if router_state.get_locked_model(group) == model_id:
+                                    router_state.unlock_group(group)
+                                switch_model = True
+                                # 确保 upstream_resp 被释放
+                                upstream_resp.release()
+                                continue
+
+                            if first_chunk_is_error:
+                                # 第一个帧就是错误 → 标记模型错误，切换模型重试
+                                stats_manager.record_call(model_id, False, "上游SSE错误")
+                                router_state.update_model_error(model_id, "上游SSE返回错误")
+                                if router_state.get_locked_model(group) == model_id:
+                                    router_state.unlock_group(group)
+                                switch_model = True
+                                upstream_resp.release()
+                                continue
+
+                        except Exception:
+                            logger.exception(
+                                "Stream first chunk validation error for model %s", model_id
+                            )
+                            stats_manager.record_call(model_id, False, "首帧读取异常")
+                            router_state.update_model_error(model_id, "首帧读取异常")
+                            if router_state.get_locked_model(group) == model_id:
+                                router_state.unlock_group(group)
+                            switch_model = True
+                            try:
+                                upstream_resp.release()
+                            except Exception:
+                                pass
+                            continue
+
+                        # 首帧验证通过 - 建立流式响应并转发
                         stats_manager.record_call(model_id, True)
                         model_acquired = False  # 由流结束时释放
+                        ttft = (time.time() - start_time) * 1000
+                        router_state.update_speed_test_result(model_id, int(ttft))
 
                         response = web.StreamResponse(
                             status=200,
@@ -1126,18 +1203,17 @@ class _RouterServer:
                         )
                         await response.prepare(request)
 
-                        # 记录 TTFT 并代理流数据
-                        first_chunk_received = False
-                        start_time = time.time()
+                        # 先写入已读取的第一帧
+                        try:
+                            await response.write(first_chunk)
+                        except Exception:
+                            logger.exception(
+                                "Stream write error (first chunk) for model %s", model_id
+                            )
 
+                        # 继续代理剩余流数据
                         try:
                             async for raw_line in upstream_resp.content:
-                                if not first_chunk_received:
-                                    first_chunk_received = True
-                                    ttft = (time.time() - start_time) * 1000
-                                    router_state.update_speed_test_result(
-                                        model_id, int(ttft)
-                                    )
                                 await response.write(raw_line)
                         except Exception:
                             logger.exception(
