@@ -1211,10 +1211,41 @@ class _RouterServer:
                                 "Stream write error (first chunk) for model %s", model_id
                             )
 
-                        # 继续代理剩余流数据
+                        # 继续代理剩余流数据，带 SSE 心跳防止客户端超时
+                        # 推理模型（如 nemotron-3-ultra）在 reasoning 阶段可能长时间无 content，
+                        # 部分客户端会误判为超时断开。通过定期发送 SSE 注释行保持连接活跃。
+                        HEARTBEAT_INTERVAL_S = 15  # 心跳间隔
+                        last_data_time = time.time()
+
                         try:
-                            async for raw_line in upstream_resp.content:
+                            while True:
+                                try:
+                                    raw_line = await asyncio.wait_for(
+                                        upstream_resp.content.readline(),
+                                        timeout=HEARTBEAT_INTERVAL_S,
+                                    )
+                                except asyncio.TimeoutError:
+                                    # 读取超时但上游可能还在 reasoning，发送心跳保持连接
+                                    heartbeat = b": heartbeat\n\n"
+                                    try:
+                                        await response.write(heartbeat)
+                                        logger.debug(
+                                            "SSE heartbeat sent for model %s (reasoning phase)",
+                                            model_id,
+                                        )
+                                    except Exception:
+                                        logger.warning(
+                                            "Client disconnected during heartbeat for model %s",
+                                            model_id,
+                                        )
+                                        break
+                                    continue
+
+                                if not raw_line:
+                                    break  # 上游流结束
+
                                 await response.write(raw_line)
+                                last_data_time = time.time()
                         except Exception:
                             logger.exception(
                                 "Stream write error for model %s", model_id
